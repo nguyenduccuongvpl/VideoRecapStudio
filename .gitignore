@@ -1,0 +1,43 @@
+# Virtual Environment
+venv/
+.venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Mypy / Ruff
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Project persistence & generated files
+*.sqlite
+*.sqlite3
+artifacts/*
+!artifacts/.gitkeep
+temp/
+out/
+*.mp4
+*.wav
+*.mp3
+*.srt
+*.json
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
