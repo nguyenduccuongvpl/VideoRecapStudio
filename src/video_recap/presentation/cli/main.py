@@ -190,6 +190,13 @@ def cli_main(args: Optional[List[str]] = None) -> int:
     probe_parser = media_subparsers.add_parser("probe", help="Probe metadata from a media file")
     probe_parser.add_argument("file", help="Path to the media file to probe")
 
+    # Subcommand: obs-review
+    obs_review_parser = subparsers.add_parser("obs-review", help="Generate interactive human review dashboard for VLM observations")
+    obs_review_parser.add_argument("observations_file", help="Path to JSON file containing list of observations")
+    obs_review_parser.add_argument("video_file", help="Path to the source video file")
+    obs_review_parser.add_argument("--output", default="observation_review.html", help="Path to output HTML file")
+    obs_review_parser.add_argument("--sample-size", type=int, default=20, help="Number of observations to sample")
+
     parsed_args = parser.parse_args(args)
 
     if parsed_args.command == "version":
@@ -519,6 +526,46 @@ def cli_main(args: Optional[List[str]] = None) -> int:
             except Exception as e:
                 print(f"ERROR: Unexpected error: {e}")
                 return 1
+
+    if parsed_args.command == "obs-review":
+        from video_recap.domain.models import Observation
+        from video_recap.application.review import StratifiedObservationSampler
+        from video_recap.presentation.cli.review_tool import generate_review_html
+
+        obs_path = Path(parsed_args.observations_file)
+        if not obs_path.exists():
+            print(f"ERROR: Observations file not found at {obs_path}")
+            return 1
+
+        try:
+            with open(obs_path, "r", encoding="utf-8") as f:
+                raw_data = json.load(f)
+            
+            if isinstance(raw_data, dict) and "observations" in raw_data:
+                obs_list_raw = raw_data["observations"]
+            elif isinstance(raw_data, list):
+                obs_list_raw = raw_data
+            else:
+                print("ERROR: Invalid observations JSON format.")
+                return 1
+
+            observations = [Observation.model_validate(item) for item in obs_list_raw]
+        except Exception as e:
+            print(f"ERROR: Failed to parse observations file: {e}")
+            return 1
+
+        sampler = StratifiedObservationSampler()
+        sampled = sampler.sample(observations, target_size=parsed_args.sample_size)
+        
+        output_path = Path(parsed_args.output)
+        try:
+            generate_review_html(sampled, parsed_args.video_file, output_path)
+            print(f"SUCCESS: Generated observation review tool at: {output_path.absolute()}")
+            print(f"Sampled {len(sampled)} observations for review.")
+            return 0
+        except Exception as e:
+            print(f"ERROR: Failed to generate HTML: {e}")
+            return 1
 
     parser.print_help()
     return 0
