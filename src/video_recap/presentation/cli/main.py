@@ -1,16 +1,34 @@
 """CLI Entry Point for VideoRecapStudio."""
 
 import argparse
+import datetime
 import json
+import uuid
 from pathlib import Path
 from typing import Any, List, Optional
 from pydantic import SecretStr
 from video_recap import __version__
 from video_recap.application.doctor import run_doctor_checks
+from video_recap.application.pipeline import (
+    CancellationToken,
+    JobOrchestrator,
+    PipelineDefinition,
+    StageContext,
+)
 from video_recap.config import get_config_paths, load_app_settings
+from video_recap.domain import Job, JobState, ProjectConfig, StageName
+from video_recap.domain.events import StageProgress
+from video_recap.infrastructure.logging import InProcessEventBus
 from video_recap.infrastructure.persistence import (
+    DatabaseManager,
+    FileSystemArtifactStore,
     FileSystemProjectRepository,
     SHA256ChecksumService,
+    SqliteCostRepository,
+    SqliteJobRepository,
+    SqliteProjectMetadataRepository,
+    SqliteStageRunRepository,
+    run_migrations,
 )
 
 
@@ -23,6 +41,43 @@ def serialize_and_redact(data: Any, redact_flag: bool) -> Any:
     if isinstance(data, SecretStr):
         return "**********" if redact_flag else data.get_secret_value()
     return data
+
+
+class FakeStage:
+    """Simulated pipeline stage for CLI execution and integration testing."""
+
+    def __init__(self, name: StageName) -> None:
+        self._name = name
+
+    @property
+    def name(self) -> StageName:
+        return self._name
+
+    def execute(self, context: StageContext) -> None:
+        import time
+
+        for i in range(1, 4):
+            progress_val = i / 3.0
+            # Cooperative cancellation check
+            context.cancellation_token.raise_if_cancelled()
+
+            # Check if cancelled in DB (external cooperative cancel)
+            db_job = context.job_repo.get_job(context.job_id)
+            if db_job and db_job.state == JobState.CANCELLED:
+                context.cancellation_token.cancel()
+                context.cancellation_token.raise_if_cancelled()
+
+            context.event_bus.publish(
+                StageProgress(
+                    job_id=context.job_id,
+                    project_id=context.project_id,
+                    stage=self.name,
+                    progress=progress_val,
+                    message=f"Working... {int(progress_val * 100)}%",
+                    timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                )
+            )
+            time.sleep(0.01)
 
 
 def cli_main(args: Optional[List[str]] = None) -> int:
@@ -103,6 +158,30 @@ def cli_main(args: Optional[List[str]] = None) -> int:
     )
     clean_parser.add_argument("--project-id", required=True, help="Unique project identifier")
 
+    # Subcommand: job
+    job_parser = subparsers.add_parser("job", help="Manage pipeline execution jobs")
+    job_subparsers = job_parser.add_subparsers(dest="job_command", help="Job subcommands")
+
+    # job create
+    job_create = job_subparsers.add_parser("create", help="Create a new job for a project")
+    job_create.add_argument("--project-id", required=True, help="The project ID")
+
+    # job run
+    job_run = job_subparsers.add_parser("run", help="Run a created job")
+    job_run.add_argument("--job-id", required=True, help="The job ID to run")
+
+    # job resume
+    job_resume = job_subparsers.add_parser("resume", help="Resume a paused/failed job")
+    job_resume.add_argument("--job-id", required=True, help="The job ID to resume")
+
+    # job cancel
+    job_cancel = job_subparsers.add_parser("cancel", help="Cancel a running job")
+    job_cancel.add_argument("--job-id", required=True, help="The job ID to cancel")
+
+    # job status
+    job_status = job_subparsers.add_parser("status", help="Get status of a job")
+    job_status.add_argument("--job-id", required=True, help="The job ID")
+
     parsed_args = parser.parse_args(args)
 
     if parsed_args.command == "version":
@@ -161,8 +240,15 @@ def cli_main(args: Optional[List[str]] = None) -> int:
                 print(f"ERROR: Failed to load config: {e}")
                 return 1
 
+    # SQLite DB Setup
+    projects_dir = Path.cwd() / "projects"
+    projects_dir.mkdir(parents=True, exist_ok=True)
+    db_path = projects_dir / "metadata.sqlite"
+    db_mgr = DatabaseManager(db_path)
+    run_migrations(db_mgr)
+
     if parsed_args.command == "project":
-        repo = FileSystemProjectRepository(Path.cwd() / "projects")
+        repo = FileSystemProjectRepository(projects_dir)
 
         if parsed_args.project_command == "init":
             try:
@@ -185,7 +271,6 @@ def cli_main(args: Optional[List[str]] = None) -> int:
                     print(f"ERROR: Project directory '{proj_dir}' does not exist.")
                     return 1
 
-                # Read project config
                 config_path = proj_dir / "project.json"
                 config_data = {}
                 if config_path.exists():
@@ -212,7 +297,6 @@ def cli_main(args: Optional[List[str]] = None) -> int:
                     print(f"ERROR: Project directory '{proj_dir}' does not exist.")
                     return 1
 
-                # Calculate SHA-256 for video source
                 config_path = proj_dir / "project.json"
                 if not config_path.exists():
                     print("ERROR: project.json missing.")
@@ -247,6 +331,162 @@ def cli_main(args: Optional[List[str]] = None) -> int:
             except Exception as e:
                 print(f"ERROR: Cleaning temp failed: {e}")
                 return 1
+
+    if parsed_args.command == "job":
+        job_repo = SqliteJobRepository(db_mgr)
+        proj_meta_repo = SqliteProjectMetadataRepository(db_mgr)
+        stage_run_repo = SqliteStageRunRepository(db_mgr)
+        cost_repo = SqliteCostRepository(db_mgr)
+
+        if parsed_args.job_command == "create":
+            try:
+                # 1. Upsert project metadata to SQLite if not already there
+                project_id = parsed_args.project_id
+                proj_dir = projects_dir / project_id
+                if not proj_dir.exists():
+                    print(f"ERROR: Project directory '{proj_dir}' not found. Run project init first.")
+                    return 1
+
+                config_path = proj_dir / "project.json"
+                if not config_path.exists():
+                    print(f"ERROR: project.json missing in '{proj_dir}'.")
+                    return 1
+
+                with open(config_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+
+                proj_config = ProjectConfig(
+                    project_id=project_id,
+                    source_video_path=meta.get("source_video_path", ""),
+                    output_directory=meta.get("output_directory", ""),
+                    preset_name=meta.get("preset_name", "balanced_movie_vi"),
+                    target_recap_duration=meta.get("target_recap_duration", 300.0),
+                    voice_name=meta.get("voice_name", "vi-VN-HoaiMyNeural"),
+                    api_keys={},
+                )
+                proj_meta_repo.save_project_config(project_id, proj_config)
+
+                # 2. Create Job
+                job_id = str(uuid.uuid4())
+                job = Job(
+                    job_id=job_id,
+                    project_id=project_id,
+                    state=JobState.CREATED,
+                )
+                job_repo.create_job(job)
+                print(f"SUCCESS: Job '{job_id}' created successfully for project '{project_id}'.")
+                return 0
+            except Exception as e:
+                print(f"ERROR: Job creation failed: {e}")
+                return 1
+
+        if parsed_args.job_command in ("run", "resume"):
+            job_id = parsed_args.job_id
+            job = job_repo.get_job(job_id)
+            if not job:
+                print(f"ERROR: Job '{job_id}' not found.")
+                return 1
+
+            config = proj_meta_repo.get_project_config(job.project_id)
+            if not config:
+                print(f"ERROR: Project config for job '{job_id}' not found.")
+                return 1
+
+            # Setup stage context
+            cancellation_token = CancellationToken()
+            artifact_store = FileSystemArtifactStore(projects_dir)
+            project_repo = FileSystemProjectRepository(projects_dir)
+            event_bus = InProcessEventBus()
+
+            # Subscribe logging outputs
+            event_bus.subscribe(
+                StageProgress, lambda e: print(f"[{e.stage.value}] Progress: {int(e.progress * 100)}% - {e.message}")
+            )
+
+            # Build pipeline of fake stages
+            fake_stages = [FakeStage(name) for name in StageName]
+            pipeline = PipelineDefinition(fake_stages)
+            orchestrator = JobOrchestrator(pipeline)
+
+            context = StageContext(
+                job_id=job_id,
+                project_id=job.project_id,
+                config=config,
+                artifact_store=artifact_store,
+                project_repo=project_repo,
+                job_repo=job_repo,
+                stage_run_repo=stage_run_repo,
+                cost_repo=cost_repo,
+                event_bus=event_bus,
+                cancellation_token=cancellation_token,
+            )
+
+            is_resume = parsed_args.job_command == "resume"
+            try:
+                print(f"Starting pipeline execution for Job '{job_id}' (resume={is_resume})...")
+                orchestrator.execute_job(job, context, resume=is_resume)
+                print(f"SUCCESS: Job '{job_id}' execution completed. State: {job.state.value}")
+                return 0
+            except Exception as e:
+                print(f"ERROR: Pipeline execution failed: {e}")
+                return 1
+
+        if parsed_args.job_command == "cancel":
+            job_id = parsed_args.job_id
+            job = job_repo.get_job(job_id)
+            if not job:
+                print(f"ERROR: Job '{job_id}' not found.")
+                return 1
+
+            # In thread-based runs, setting status in DB cooperative aborts.
+            # Whitelist check: ensure CANCELLED transition is valid.
+            try:
+                # Mock context to transition
+                event_bus = InProcessEventBus()
+                context = StageContext(
+                    job_id=job_id,
+                    project_id=job.project_id,
+                    config=None,  # type: ignore
+                    artifact_store=None,  # type: ignore
+                    project_repo=None,  # type: ignore
+                    job_repo=job_repo,
+                    stage_run_repo=stage_run_repo,
+                    cost_repo=cost_repo,
+                    event_bus=event_bus,
+                    cancellation_token=CancellationToken(),
+                )
+                orchestrator = JobOrchestrator(PipelineDefinition([]))
+                orchestrator._transition_job_state(job, JobState.CANCELLED, context)
+                print(f"SUCCESS: Job '{job_id}' marked as CANCELLED.")
+                return 0
+            except Exception as e:
+                print(f"ERROR: Failed to cancel job: {e}")
+                return 1
+
+        if parsed_args.job_command == "status":
+            job_id = parsed_args.job_id
+            job = job_repo.get_job(job_id)
+            if not job:
+                print(f"ERROR: Job '{job_id}' not found.")
+                return 1
+
+            # Get stage runs
+            runs = stage_run_repo.get_stage_runs(job_id)
+
+            print("=" * 60)
+            print(f"Job Status: {job_id}")
+            print("=" * 60)
+            print(f"Project ID:      {job.project_id}")
+            print(f"Current State:   {job.state.value}")
+            print(f"Current Stage:   {job.current_stage.value if job.current_stage else 'None'}")
+            print(f"Error Details:   {job.error_details or 'None'}")
+            print("-" * 60)
+            print("Pipeline Stages:")
+            for r in runs:
+                err_msg = f" - Error: {r.error_message}" if r.error_message else ""
+                print(f"  - {r.stage_name}: {r.status} (Started: {r.started_at}, Completed: {r.completed_at}){err_msg}")
+            print("=" * 60)
+            return 0
 
     parser.print_help()
     return 0

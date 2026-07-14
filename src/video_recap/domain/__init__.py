@@ -7,6 +7,7 @@ from video_recap.domain.errors import (
     ArtifactError,
     ProjectNotFoundError,
     ProjectAlreadyExistsError,
+    JobCancelledError,
 )
 from video_recap.domain.events import (
     LogContext,
@@ -65,6 +66,7 @@ __all__ = [
     "ArtifactError",
     "ProjectNotFoundError",
     "ProjectAlreadyExistsError",
+    "JobCancelledError",
     "LogContext",
     "ProgressEvent",
     "StageStarted",

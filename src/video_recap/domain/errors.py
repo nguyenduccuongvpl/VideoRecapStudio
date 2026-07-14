@@ -29,3 +29,9 @@ class ProjectAlreadyExistsError(DomainError):
     """Raised when trying to initialize a project that already exists."""
 
     pass
+
+
+class JobCancelledError(DomainError):
+    """Raised when a job execution is cooperatively cancelled."""
+
+    pass
