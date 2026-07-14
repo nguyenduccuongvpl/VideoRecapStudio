@@ -9,6 +9,7 @@ from video_recap.domain.errors import (
     ProjectAlreadyExistsError,
     JobCancelledError,
     ProcessExecutionError,
+    AudioDurationOverflowError,
 )
 from video_recap.domain.events import (
     LogContext,
@@ -69,6 +70,7 @@ __all__ = [
     "ProjectAlreadyExistsError",
     "JobCancelledError",
     "ProcessExecutionError",
+    "AudioDurationOverflowError",
     "LogContext",
     "ProgressEvent",
     "StageStarted",

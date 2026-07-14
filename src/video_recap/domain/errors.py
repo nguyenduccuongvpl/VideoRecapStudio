@@ -53,3 +53,9 @@ class ProcessExecutionError(DomainError):
         self.return_code = return_code
         self.stdout = stdout
         self.stderr = stderr
+
+
+class AudioDurationOverflowError(DomainError):
+    """Raised when narration overlay duration exceeds the video clip segment length."""
+
+    pass
