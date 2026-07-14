@@ -5,7 +5,7 @@ pydantic-settings>=2.2.0
 
 # Media Processing
 ffmpeg-python>=0.2.0
-pyscenedetect>=0.6.2
+scenedetect>=0.6.2
 
 # AI Providers
 openai>=1.12.0
