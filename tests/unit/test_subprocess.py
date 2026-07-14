@@ -8,7 +8,7 @@ from pathlib import Path
 from video_recap.application.pipeline import CancellationToken
 from video_recap.domain import JobCancelledError, ProcessExecutionError
 from video_recap.domain.media import CommandSpec
-from video_recap.infrastructure.media.ffmpeg_builder import (
+from video_recap.domain.media import (
     FfmpegCommandBuilder,
     FfprobeCommandBuilder,
     FfmpegProgressParser,
@@ -162,30 +162,35 @@ def test_unicode_paths(tmp_path: Path) -> None:
     unicode_dir = tmp_path / "Chữ_Việt_Nam"
     unicode_dir.mkdir()
     target_file = unicode_dir / "tệp_tin.txt"
-    target_file.write_text("Dữ liệu unicode")
+    target_file.write_text("Dữ liệu unicode", encoding="utf-8")
+
+    import os
+    env_vars = dict(os.environ)
+    env_vars["TARGET_FILE"] = str(target_file)
+    env_vars["PYTHONIOENCODING"] = "utf-8"
 
     # Command: read file content using python print
     spec = CommandSpec(
         args=[
             sys.executable,
             "-c",
-            "import sys; f=open(sys.argv[1], 'r', encoding='utf-8'); print(f.read())",
-            str(target_file),
-        ]
+            "import os; f=open(os.environ['TARGET_FILE'], 'r', encoding='utf-8'); print(f.read())",
+        ],
+        env=env_vars,
     )
     res = runner.run(spec)
     assert res.return_code == 0
     assert "Dữ liệu unicode" in res.stdout
 
 
-def test_ffmpeg_progress_callback() -> None:
+def test_ffmpeg_progress_callback(tmp_path: Path) -> None:
     """Verify progress callback is triggered during mock ffmpeg runner execution."""
     runner = SubprocessRunner()
     # Mock ffmpeg progress output command: writes out_time_us updates
     # We name the python binary 'ffmpeg_mock' to trigger the is_ffmpeg check inside runner!
-    # On Windows, sys.executable is python.exe. We can copy it to ffmpeg_mock.exe!
+    # Copy python to tmp_path/ffmpeg_mock.exe so it's always writeable
     import shutil
-    ffmpeg_mock_bin = Path(sys.executable).parent / f"ffmpeg_mock{'.exe' if os.name == 'nt' else ''}"
+    ffmpeg_mock_bin = tmp_path / f"ffmpeg_mock{'.exe' if os.name == 'nt' else ''}"
     try:
         shutil.copy2(sys.executable, ffmpeg_mock_bin)
     except Exception:
@@ -209,34 +214,13 @@ def test_ffmpeg_progress_callback() -> None:
     def callback(val: float) -> None:
         progresses.append(val)
 
-    # Instantiate progress parser inside execution
-    # Wait, the runner needs total duration, but wait! How does SubprocessRunner know the duration?
-    # Ah! SubprocessRunner instantiates FfmpegProgressParser() with duration_seconds=None if it doesn't know it!
-    # But wait, if duration_seconds is None, the progress_parser's parse_line returns None, so the callback is never called!
-    # To fix this, we should allow passing duration_seconds or setting it inside FfmpegProgressParser
-    # or inside the runner, or let the caller configure the duration!
-    # Let's check: how does FfmpegProgressParser know the duration inside SubprocessRunner?
-    # Ah! In a real run, the orchestrator/stage knows the duration of the video.
-    # But the SubprocessRunner's run method only accepts:
-    # run(self, spec: CommandSpec, cancellation_token: Optional[CancellationToken] = None, progress_callback: Optional[Callable[[float], None]] = None)
-    # Wait! How can we pass the duration?
-    # We can pass duration_seconds as an attribute of the progress_callback itself (e.g. callback.duration = 10.0),
-    # or let the builder include duration, or pass it in spec!
-    # Yes! We can pass it in `CommandSpec` or let the progress_callback have a `duration_seconds` attribute,
-    # or check if progress_callback has `duration_seconds` attribute, or we can look for it in env/metadata.
-    # Let's design this: inside SubprocessRunner, if it has `progress_callback` and `is_ffmpeg`:
-    #   duration = getattr(progress_callback, "duration_seconds", None)
-    #   progress_parser = FfmpegProgressParser(duration)
-    # This is an incredibly elegant and dynamic way to pass the duration without changing the signature of run()!
-    # Let's verify: yes, if the callback has `duration_seconds` attribute, we use it!
-    
     callback.duration_seconds = 10.0  # type: ignore
 
     try:
         runner.run(spec, progress_callback=callback)
     finally:
         # Cleanup mock binary if created
-        if ffmpeg_mock_bin.name == "ffmpeg_mock.exe" and ffmpeg_mock_bin.exists():
+        if ffmpeg_mock_bin.name.startswith("ffmpeg_mock") and ffmpeg_mock_bin.exists():
             try:
                 ffmpeg_mock_bin.unlink()
             except Exception:
@@ -247,3 +231,4 @@ def test_ffmpeg_progress_callback() -> None:
     assert 0.25 in progresses
     assert 0.5 in progresses
     assert 1.0 in progresses
+

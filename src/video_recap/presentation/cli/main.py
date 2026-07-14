@@ -182,6 +182,14 @@ def cli_main(args: Optional[List[str]] = None) -> int:
     job_status = job_subparsers.add_parser("status", help="Get status of a job")
     job_status.add_argument("--job-id", required=True, help="The job ID")
 
+    # Subcommand: media
+    media_parser = subparsers.add_parser("media", help="Media utilities")
+    media_subparsers = media_parser.add_subparsers(dest="media_command", help="Media subcommands")
+
+    # media probe
+    probe_parser = media_subparsers.add_parser("probe", help="Probe metadata from a media file")
+    probe_parser.add_argument("file", help="Path to the media file to probe")
+
     parsed_args = parser.parse_args(args)
 
     if parsed_args.command == "version":
@@ -487,6 +495,30 @@ def cli_main(args: Optional[List[str]] = None) -> int:
                 print(f"  - {r.stage_name}: {r.status} (Started: {r.started_at}, Completed: {r.completed_at}){err_msg}")
             print("=" * 60)
             return 0
+
+    if parsed_args.command == "media":
+        if parsed_args.media_command == "probe":
+            from video_recap.infrastructure.media.subprocess_runner import SubprocessRunner
+            from video_recap.application.probe import MediaProbeService, MediaProbeError
+
+            runner = SubprocessRunner()
+            try:
+                settings = load_app_settings()
+                ffprobe_path = settings.media.ffprobe_path or "ffprobe"
+            except Exception:
+                ffprobe_path = "ffprobe"
+
+            service = MediaProbeService(runner, ffprobe_path=ffprobe_path)
+            try:
+                info = service.probe(parsed_args.file)
+                print(info.model_dump_json(indent=2))
+                return 0
+            except MediaProbeError as e:
+                print(f"ERROR: Probing failed: {e}")
+                return 1
+            except Exception as e:
+                print(f"ERROR: Unexpected error: {e}")
+                return 1
 
     parser.print_help()
     return 0

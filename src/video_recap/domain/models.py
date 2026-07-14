@@ -92,20 +92,47 @@ class TimeRange(BaseModel):
 class MediaStreamInfo(BaseModel):
     """Metadata for a single stream within a media file."""
 
+    index: int = 0
+    stream_type: str  # "video", "audio", "subtitle", etc.
     codec: str
-    stream_type: str
+    codec_long_name: Optional[str] = None
+    profile: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    display_aspect_ratio: Optional[str] = None
+    pix_fmt: Optional[str] = None
+    color_space: Optional[str] = None
+    color_transfer: Optional[str] = None
+    color_primaries: Optional[str] = None
+    fps: Optional[float] = None
+    avg_frame_rate: Optional[str] = None
+    r_frame_rate: Optional[str] = None
+    rotation: Optional[float] = None
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    channel_layout: Optional[str] = None
+    language: Optional[str] = None
+    disposition: dict[str, int] = Field(default_factory=dict)
     duration: Optional[float] = Field(None, ge=0.0)
     bit_rate: Optional[int] = Field(None, ge=0)
+    start_time: Optional[float] = None
+    tags: dict[str, str] = Field(default_factory=dict)
 
 
 class MediaInfo(BaseArtifact):
     """Technical details of the source video."""
 
-    resolution: str
-    fps: float = Field(..., gt=0.0)
+    format_name: str = "unknown"
     duration: float = Field(..., gt=0.0)
     size_bytes: int = Field(..., ge=0)
+    bit_rate: Optional[int] = Field(None, ge=0)
     streams: List[MediaStreamInfo]
+    tags: dict[str, str] = Field(default_factory=dict)
+    resolution: str
+    fps: float = Field(..., gt=0.0)
+    has_video: bool = False
+    has_audio: bool = False
+    vfr_detected: bool = False
 
 
 class Shot(BaseModel):

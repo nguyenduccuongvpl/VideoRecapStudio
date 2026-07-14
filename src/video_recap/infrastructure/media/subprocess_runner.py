@@ -83,10 +83,11 @@ class SubprocessRunner:
 
         # 3. Detect if running FFmpeg to parse progress outputs
         # We dynamic import to avoid circular dependency
-        from video_recap.infrastructure.media.ffmpeg_builder import FfmpegProgressParser
+        from video_recap.domain.media import FfmpegProgressParser
 
         is_ffmpeg = len(spec.args) > 0 and "ffmpeg" in os.path.basename(spec.args[0]).lower()
-        progress_parser = FfmpegProgressParser() if (is_ffmpeg and progress_callback) else None
+        duration = getattr(progress_callback, "duration_seconds", None) if progress_callback else None
+        progress_parser = FfmpegProgressParser(duration) if (is_ffmpeg and progress_callback) else None
 
         start_time = time.time()
         stdout_lines = []
@@ -160,14 +161,24 @@ class SubprocessRunner:
         while not stdout_queue.empty():
             try:
                 line_bytes = stdout_queue.get_nowait()
-                stdout_lines.append(line_bytes.decode("utf-8", errors="ignore"))
+                line = line_bytes.decode("utf-8", errors="ignore")
+                stdout_lines.append(line)
+                if progress_parser and progress_callback:
+                    prog = progress_parser.parse_line(line)
+                    if prog is not None:
+                        progress_callback(prog)
             except Empty:
                 break
 
         while not stderr_queue.empty():
             try:
                 line_bytes = stderr_queue.get_nowait()
-                stderr_lines.append(line_bytes.decode("utf-8", errors="ignore"))
+                line = line_bytes.decode("utf-8", errors="ignore")
+                stderr_lines.append(line)
+                if progress_parser and progress_callback:
+                    prog = progress_parser.parse_line(line)
+                    if prog is not None:
+                        progress_callback(prog)
             except Empty:
                 break
 
@@ -177,7 +188,7 @@ class SubprocessRunner:
         return_code = proc.returncode
         if return_code != 0:
             raise ProcessExecutionError(
-                message=f"Command exited with non-zero status {return_code}",
+                message=f"Command exited with non-zero exit status {return_code}",
                 command=spec.args,
                 return_code=return_code,
                 stdout=stdout_str,
