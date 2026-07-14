@@ -1,0 +1,48 @@
+{
+  "description": "General configuration data of a project.",
+  "properties": {
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "source_video_path": {
+      "title": "Source Video Path",
+      "type": "string"
+    },
+    "output_directory": {
+      "title": "Output Directory",
+      "type": "string"
+    },
+    "preset_name": {
+      "title": "Preset Name",
+      "type": "string"
+    },
+    "target_recap_duration": {
+      "exclusiveMinimum": 0.0,
+      "title": "Target Recap Duration",
+      "type": "number"
+    },
+    "voice_name": {
+      "title": "Voice Name",
+      "type": "string"
+    },
+    "api_keys": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Api Keys",
+      "type": "object"
+    }
+  },
+  "required": [
+    "project_id",
+    "source_video_path",
+    "output_directory",
+    "preset_name",
+    "target_recap_duration",
+    "voice_name",
+    "api_keys"
+  ],
+  "title": "ProjectConfig",
+  "type": "object"
+}

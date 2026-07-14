@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "MediaStreamInfo": {
+      "description": "Metadata for a single stream within a media file.",
+      "properties": {
+        "codec": {
+          "title": "Codec",
+          "type": "string"
+        },
+        "stream_type": {
+          "title": "Stream Type",
+          "type": "string"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "bit_rate": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bit Rate"
+        }
+      },
+      "required": [
+        "codec",
+        "stream_type"
+      ],
+      "title": "MediaStreamInfo",
+      "type": "object"
+    }
+  },
+  "description": "Technical details of the source video.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "producer_stage": {
+      "title": "Producer Stage",
+      "type": "string"
+    },
+    "resolution": {
+      "title": "Resolution",
+      "type": "string"
+    },
+    "fps": {
+      "exclusiveMinimum": 0.0,
+      "title": "Fps",
+      "type": "number"
+    },
+    "duration": {
+      "exclusiveMinimum": 0.0,
+      "title": "Duration",
+      "type": "number"
+    },
+    "size_bytes": {
+      "minimum": 0,
+      "title": "Size Bytes",
+      "type": "integer"
+    },
+    "streams": {
+      "items": {
+        "$ref": "#/$defs/MediaStreamInfo"
+      },
+      "title": "Streams",
+      "type": "array"
+    }
+  },
+  "required": [
+    "producer_stage",
+    "resolution",
+    "fps",
+    "duration",
+    "size_bytes",
+    "streams"
+  ],
+  "title": "MediaInfo",
+  "type": "object"
+}

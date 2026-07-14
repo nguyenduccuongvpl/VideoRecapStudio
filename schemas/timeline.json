@@ -1,0 +1,119 @@
+{
+  "$defs": {
+    "SourceClip": {
+      "description": "A reference to a source video chunk.",
+      "properties": {
+        "filepath": {
+          "title": "Filepath",
+          "type": "string"
+        },
+        "time_range": {
+          "$ref": "#/$defs/TimeRange"
+        }
+      },
+      "required": [
+        "filepath",
+        "time_range"
+      ],
+      "title": "SourceClip",
+      "type": "object"
+    },
+    "TimeRange": {
+      "description": "Represents a time range with start and end times in seconds.",
+      "properties": {
+        "start": {
+          "minimum": 0.0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "minimum": 0.0,
+          "title": "End",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "TimeRange",
+      "type": "object"
+    },
+    "TimelineSegment": {
+      "description": "A timeline block matching a clip to narration audio.",
+      "properties": {
+        "segment_id": {
+          "minimum": 0,
+          "title": "Segment Id",
+          "type": "integer"
+        },
+        "narration_text": {
+          "title": "Narration Text",
+          "type": "string"
+        },
+        "clip": {
+          "$ref": "#/$defs/SourceClip"
+        },
+        "narration_audio_path": {
+          "title": "Narration Audio Path",
+          "type": "string"
+        },
+        "narration_duration": {
+          "exclusiveMinimum": 0.0,
+          "title": "Narration Duration",
+          "type": "number"
+        },
+        "target_start": {
+          "minimum": 0.0,
+          "title": "Target Start",
+          "type": "number"
+        }
+      },
+      "required": [
+        "segment_id",
+        "narration_text",
+        "clip",
+        "narration_audio_path",
+        "narration_duration",
+        "target_start"
+      ],
+      "title": "TimelineSegment",
+      "type": "object"
+    }
+  },
+  "description": "The constructed render timeline.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "producer_stage": {
+      "title": "Producer Stage",
+      "type": "string"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/TimelineSegment"
+      },
+      "title": "Segments",
+      "type": "array"
+    },
+    "allow_overlaps": {
+      "default": false,
+      "title": "Allow Overlaps",
+      "type": "boolean"
+    },
+    "allow_gaps": {
+      "default": true,
+      "title": "Allow Gaps",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "producer_stage",
+    "segments"
+  ],
+  "title": "Timeline",
+  "type": "object"
+}

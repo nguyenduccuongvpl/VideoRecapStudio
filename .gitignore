@@ -27,6 +27,7 @@ out/
 *.mp3
 *.srt
 *.json
+!schemas/*.json
 
 # Environment variables & secrets
 .env

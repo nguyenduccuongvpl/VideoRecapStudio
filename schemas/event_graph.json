@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "Event": {
+      "description": "A logical event occurring in the narrative.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "time_range": {
+          "$ref": "#/$defs/TimeRange"
+        },
+        "participant_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Participant Ids",
+          "type": "array"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "time_range",
+        "participant_ids",
+        "evidence_refs"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "EventRelation": {
+      "description": "A causal or temporal connection between two events.",
+      "properties": {
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "relation_type": {
+          "title": "Relation Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "target_id",
+        "relation_type"
+      ],
+      "title": "EventRelation",
+      "type": "object"
+    },
+    "TimeRange": {
+      "description": "Represents a time range with start and end times in seconds.",
+      "properties": {
+        "start": {
+          "minimum": 0.0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "minimum": 0.0,
+          "title": "End",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "TimeRange",
+      "type": "object"
+    }
+  },
+  "description": "Network of entities, events, and relations.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "producer_stage": {
+      "title": "Producer Stage",
+      "type": "string"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/Event"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "relations": {
+      "items": {
+        "$ref": "#/$defs/EventRelation"
+      },
+      "title": "Relations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "producer_stage",
+    "events",
+    "relations"
+  ],
+  "title": "EventGraph",
+  "type": "object"
+}

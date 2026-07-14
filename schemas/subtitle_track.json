@@ -1,0 +1,79 @@
+{
+  "$defs": {
+    "SubtitleCue": {
+      "description": "A single subtitle line with time bounds.",
+      "properties": {
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "time_range": {
+          "$ref": "#/$defs/TimeRange"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "time_range",
+        "text"
+      ],
+      "title": "SubtitleCue",
+      "type": "object"
+    },
+    "TimeRange": {
+      "description": "Represents a time range with start and end times in seconds.",
+      "properties": {
+        "start": {
+          "minimum": 0.0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "minimum": 0.0,
+          "title": "End",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "TimeRange",
+      "type": "object"
+    }
+  },
+  "description": "Ph\u1ee5 \u0111\u1ec1 (SRT ho\u1eb7c vtt) c\u00f3 c\u1ea5u tr\u00fac.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "producer_stage": {
+      "title": "Producer Stage",
+      "type": "string"
+    },
+    "language": {
+      "title": "Language",
+      "type": "string"
+    },
+    "cues": {
+      "items": {
+        "$ref": "#/$defs/SubtitleCue"
+      },
+      "title": "Cues",
+      "type": "array"
+    }
+  },
+  "required": [
+    "producer_stage",
+    "language",
+    "cues"
+  ],
+  "title": "SubtitleTrack",
+  "type": "object"
+}
