@@ -8,6 +8,16 @@ from video_recap.domain.errors import (
     ProjectNotFoundError,
     ProjectAlreadyExistsError,
 )
+from video_recap.domain.events import (
+    LogContext,
+    ProgressEvent,
+    StageStarted,
+    StageProgress,
+    StageCompleted,
+    StageFailed,
+    JobStateChanged,
+    UserActionRequired,
+)
 from video_recap.domain.models import (
     BaseArtifact,
     TimeRange,
@@ -55,6 +65,14 @@ __all__ = [
     "ArtifactError",
     "ProjectNotFoundError",
     "ProjectAlreadyExistsError",
+    "LogContext",
+    "ProgressEvent",
+    "StageStarted",
+    "StageProgress",
+    "StageCompleted",
+    "StageFailed",
+    "JobStateChanged",
+    "UserActionRequired",
     "BaseArtifact",
     "TimeRange",
     "MediaStreamInfo",
