@@ -1,6 +1,13 @@
 """Domain Layer containing core business entities, value objects, and policies."""
 
 from video_recap.domain.capability import CapabilityItem, CapabilityReport
+from video_recap.domain.errors import (
+    DomainError,
+    PathTraversalError,
+    ArtifactError,
+    ProjectNotFoundError,
+    ProjectAlreadyExistsError,
+)
 from video_recap.domain.models import (
     BaseArtifact,
     TimeRange,
@@ -43,6 +50,11 @@ from video_recap.domain.models import (
 __all__ = [
     "CapabilityItem",
     "CapabilityReport",
+    "DomainError",
+    "PathTraversalError",
+    "ArtifactError",
+    "ProjectNotFoundError",
+    "ProjectAlreadyExistsError",
     "BaseArtifact",
     "TimeRange",
     "MediaStreamInfo",

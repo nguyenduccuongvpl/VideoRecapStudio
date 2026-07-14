@@ -59,6 +59,7 @@ class BaseArtifact(BaseModel):
 
     schema_version: str = "1.0.0"
     producer_stage: str
+    input_hashes: Dict[str, str] = Field(default_factory=dict)
 
 
 # --- Core Models ---

@@ -21,6 +21,7 @@ htmlcov/
 artifacts/*
 !artifacts/.gitkeep
 temp/
+projects/
 out/
 *.mp4
 *.wav
