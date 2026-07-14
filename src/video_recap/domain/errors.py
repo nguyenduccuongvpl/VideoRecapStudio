@@ -59,3 +59,24 @@ class AudioDurationOverflowError(DomainError):
     """Raised when narration overlay duration exceeds the video clip segment length."""
 
     pass
+
+
+class ProviderError(DomainError):
+    """Base exception for all AI provider integration and service errors."""
+
+    pass
+
+
+class UnsupportedCapabilityError(ProviderError):
+    """Raised when a model is requested to perform an operation it does not support."""
+
+    pass
+
+
+class InvalidStructuredOutputError(ProviderError):
+    """Raised when a model response cannot be parsed into the requested Pydantic schema."""
+
+    def __init__(self, message: str, raw_output: str) -> None:
+        super().__init__(message)
+        self.raw_output = raw_output
+

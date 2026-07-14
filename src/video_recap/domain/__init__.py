@@ -10,6 +10,9 @@ from video_recap.domain.errors import (
     JobCancelledError,
     ProcessExecutionError,
     AudioDurationOverflowError,
+    ProviderError,
+    UnsupportedCapabilityError,
+    InvalidStructuredOutputError,
 )
 from video_recap.domain.events import (
     LogContext,
@@ -71,6 +74,9 @@ __all__ = [
     "JobCancelledError",
     "ProcessExecutionError",
     "AudioDurationOverflowError",
+    "ProviderError",
+    "UnsupportedCapabilityError",
+    "InvalidStructuredOutputError",
     "LogContext",
     "ProgressEvent",
     "StageStarted",
