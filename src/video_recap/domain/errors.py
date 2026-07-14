@@ -35,3 +35,21 @@ class JobCancelledError(DomainError):
     """Raised when a job execution is cooperatively cancelled."""
 
     pass
+
+
+class ProcessExecutionError(DomainError):
+    """Raised when a subprocess execution fails or returns a non-zero exit code."""
+
+    def __init__(
+        self,
+        message: str,
+        command: list[str],
+        return_code: int | None = None,
+        stdout: str = "",
+        stderr: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.command = command
+        self.return_code = return_code
+        self.stdout = stdout
+        self.stderr = stderr
