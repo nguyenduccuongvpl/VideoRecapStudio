@@ -112,6 +112,10 @@ class FfmpegCommandBuilder:
         video_filter: Optional[str] = None,
         audio_filter: Optional[str] = None,
         duration: Optional[float] = None,
+        audio_channels: Optional[int] = None,
+        audio_rate: Optional[int] = None,
+        video_fps: Optional[float] = None,
+        extra_args: Optional[List[str]] = None,
     ) -> "FfmpegCommandBuilder":
         """Add output destination with encoding settings."""
         self._outputs.append(
@@ -122,6 +126,10 @@ class FfmpegCommandBuilder:
                 "video_filter": video_filter,
                 "audio_filter": audio_filter,
                 "duration": duration,
+                "audio_channels": audio_channels,
+                "audio_rate": audio_rate,
+                "video_fps": video_fps,
+                "extra_args": extra_args,
             }
         )
         return self
@@ -152,16 +160,24 @@ class FfmpegCommandBuilder:
 
         # Append Outputs
         for out in self._outputs:
-            if out["video_codec"]:
+            if out.get("video_codec"):
                 args.extend(["-c:v", str(out["video_codec"])])
-            if out["audio_codec"]:
+            if out.get("audio_codec"):
                 args.extend(["-c:a", str(out["audio_codec"])])
-            if out["video_filter"]:
+            if out.get("video_filter"):
                 args.extend(["-vf", str(out["video_filter"])])
-            if out["audio_filter"]:
+            if out.get("audio_filter"):
                 args.extend(["-af", str(out["audio_filter"])])
-            if out["duration"] is not None:
+            if out.get("audio_channels") is not None:
+                args.extend(["-ac", str(out["audio_channels"])])
+            if out.get("audio_rate") is not None:
+                args.extend(["-ar", str(out["audio_rate"])])
+            if out.get("video_fps") is not None:
+                args.extend(["-r", str(out["video_fps"])])
+            if out.get("duration") is not None:
                 args.extend(["-t", f"{out['duration']:.6f}"])
+            if out.get("extra_args"):
+                args.extend(out["extra_args"])
 
             args.append(str(out["path"]))
 
